@@ -1,0 +1,13 @@
+*.csv
+
+*.tsv
+
+*.xlsx
+
+*.pdf
+
+*.xls
+
+venv/
+
+__pycache__/
