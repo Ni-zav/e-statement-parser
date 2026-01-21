@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Universal Bank Parser</title>
+    <!-- Modern Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;700&display=swap" rel="stylesheet">
+    
+    <!-- Dependencies via CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #22c55e;
+            --error: #ef4444;
+            --warning: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 2rem 1rem;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        header {
+            margin-bottom: 3rem;
+            text-align: center;
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 3rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.75rem;
+            letter-spacing: -0.02em;
+        }
+
+        p.subtitle {
+            font-size: 1.125rem;
+            color: var(--text-muted);
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 2.5rem;
+            border-radius: 1.5rem;
+            border: 1px solid var(--border);
+            box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.5);
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+        }
+
+        /* Drop Zone Styles */
+        .drop-zone {
+            width: 100%;
+            height: 200px;
+            border: 2px dashed var(--border);
+            border-radius: 1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 2rem;
+            background: rgba(15, 23, 42, 0.3);
+        }
+
+        .drop-zone:hover, .drop-zone.drag-over {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .drop-zone i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            color: var(--primary);
+        }
+
+        .drop-zone p {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .drop-zone .file-info {
+            margin-top: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        /* Controls */
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        label {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        select, button {
+            padding: 0.875rem 1.25rem;
+            border-radius: 0.75rem;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+
+        button.primary {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+            align-self: flex-end;
+        }
+
+        button.primary:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
+        button.primary:active {
+            transform: translateY(0);
+        }
+
+        button.primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Results */
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .tx-stats {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .table-container {
+            overflow-x: auto;
+            border-radius: 1rem;
+            border: 1px solid var(--border);
+            background: rgba(15, 23, 42, 0.2);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            min-width: 800px;
+        }
+
+        th {
+            background: rgba(30, 41, 59, 0.5);
+            padding: 1rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.875rem;
+        }
+
+        tr:hover td {
+            background: rgba(99, 102, 241, 0.03);
+        }
+
+        .col-date { width: 140px; }
+        .col-desc { min-width: 250px; }
+        .col-cat { width: 180px; }
+        .col-type { width: 100px; }
+        .col-amount { width: 150px; text-align: right; }
+
+        .badge {
+            padding: 0.375rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-income { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
+        .badge-expense { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+        .badge-cat { background: rgba(255, 255, 255, 0.05); color: var(--text); border: 1px solid var(--border); }
+
+        /* Loading */
+        .loader-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.8);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(99, 102, 241, 0.1);
+            border-left-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Success/Empty states */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-muted);
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.3;
+        }
+
+        .amount-pos { color: #4ade80; font-weight: 600; }
+        .amount-neg { color: #f87171; font-weight: 600; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .controls { grid-template-columns: 1fr; }
+            h1 { font-size: 2.25rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="loader-overlay" id="loader">
+        <div class="spinner"></div>
+        <p id="loaderText">Processing file...</p>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>Universal Bank Parser</h1>
+            <p class="subtitle">Secure, local bank statement processing</p>
+        </header>
+
+        <div class="card">
+            <div class="drop-zone" id="dropZone">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary); margin-bottom: 1rem;">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <p>Drag & drop your file here</p>
+                <span class="file-info">Supports PDF (BCA/CIMB) or XLSX (Mandiri)</span>
+                <input type="file" id="fileInput" hidden accept=".pdf,.xlsx">
+            </div>
+
+            <div class="controls">
+                <div class="input-group">
+                    <label>Selected File</label>
+                    <input type="text" id="fileNameDisplay" value="No file selected" readonly style="background: var(--bg); border: 1px solid var(--border); padding: 0.875rem; border-radius: 0.75rem; color: var(--text-muted);">
+                </div>
+                <div class="input-group">
+                    <label>Bank Template</label>
+                    <select id="bankType">
+                        <option value="auto">Auto-Detect</option>
+                        <option value="bca">BCA (PDF)</option>
+                        <option value="mandiri">Mandiri (XLSX)</option>
+                        <option value="cimb">CIMB (PDF)</option>
+                    </select>
+                </div>
+                <button class="primary" id="parseBtn" disabled>Process File</button>
+            </div>
+
+            <div id="resultsContainer" style="display: none;">
+                <div class="results-header">
+                    <div class="tx-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Transactions</span>
+                            <span class="stat-value" id="countVal">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Total In</span>
+                            <span class="stat-value amount-pos" id="incomeVal">Rp 0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Total Out</span>
+                            <span class="stat-value amount-neg" id="expenseVal">Rp 0</span>
+                        </div>
+                    </div>
+                    <button class="primary" onclick="downloadCSV()" style="background: var(--success); border-color: var(--success);">
+                        Export to CSV
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 0.5rem; vertical-align: middle;">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="col-date">Date</th>
+                                <th class="col-desc">Description</th>
+                                <th class="col-cat">Category</th>
+                                <th class="col-type">Type</th>
+                                <th class="col-amount">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody id="txBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="emptyState" class="empty-state">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="9" y1="9" x2="15" y2="9"></line>
+                    <line x1="9" y1="13" x2="15" y2="13"></line>
+                    <line x1="9" y1="17" x2="13" y2="17"></line>
+                </svg>
+                <p>Upload a statement to start parsing</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // PDF.js worker setup
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileNameDisplay = document.getElementById('fileNameDisplay');
+        const parseBtn = document.getElementById('parseBtn');
+        const bankType = document.getElementById('bankType');
+        const loader = document.getElementById('loader');
+        const loaderText = document.getElementById('loaderText');
+        
+        let currentFile = null;
+        let parsedTransactions = [];
+
+        // UI Handlers
+        dropZone.onclick = () => fileInput.click();
+        
+        dropZone.ondragover = (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        };
+
+        dropZone.ondragleave = () => dropZone.classList.remove('drag-over');
+
+        dropZone.ondrop = (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            handleFile(e.dataTransfer.files[0]);
+        };
+
+        fileInput.onchange = (e) => handleFile(e.target.files[0]);
+
+        function handleFile(file) {
+            if (!file) return;
+            currentFile = file;
+            fileNameDisplay.value = file.name;
+            parseBtn.disabled = false;
+            
+            // Auto-detect bank type if it's set to auto
+            if (bankType.value === 'auto') {
+                const name = file.name.toLowerCase();
+                if (name.includes('bca')) bankType.value = 'bca';
+                else if (name.includes('mandiri')) bankType.value = 'mandiri';
+                else if (name.includes('cimb')) bankType.value = 'cimb';
+            }
+        }
+
+        parseBtn.onclick = async () => {
+            if (!currentFile) return;
+            
+            showLoader("Reading file contents...");
+            try {
+                const type = bankType.value;
+                const extension = currentFile.name.split('.').pop().toLowerCase();
+                
+                if (extension === 'pdf') {
+                    const text = await extractTextFromPDF(currentFile);
+                    if (type === 'bca' || (type === 'auto' && text.includes('BCA'))) {
+                        parseBCA(text);
+                    } else if (type === 'cimb' || (type === 'auto' && text.includes('CIMB'))) {
+                        parseCIMB(text);
+                    } else {
+                        throw new Error("Could not determine bank type for PDF. Please select manually.");
+                    }
+                } else if (extension === 'xlsx' || extension === 'xls') {
+                    const data = await readXLSX(currentFile);
+                    parseMandiri(data);
+                } else {
+                    throw new Error("Unsupported file format. Please use PDF or XLSX.");
+                }
+                
+                renderResults();
+            } catch (err) {
+                alert("Error parsing file: " + err.message);
+                console.error(err);
+            } finally {
+                hideLoader();
+            }
+        };
+
+        // Extraction Helpers
+        async function extractTextFromPDF(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            let fullText = '';
+            
+            for (let i = 1; i <= pdf.numPages; i++) {
+                showLoader(`Extracting page ${i}/${pdf.numPages}...`);
+                const page = await pdf.getPage(i);
+                const content = await page.getTextContent();
+                const pageText = content.items.map(item => item.str).join(' ');
+                fullText += pageText + '\n';
+            }
+            return fullText;
+        }
+
+        async function readXLSX(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                        resolve(json);
+                    } catch (err) { reject(err); }
+                };
+                reader.onerror = reject;
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        // --- Ported Logic Start ---
+
+        function cleanDescription(desc) {
+            if (!desc) return "";
+            return desc.replace(/\\n/g, ' ').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+
+        function categorize(desc, type) {
+            const d = desc.toUpperCase();
+            
+            // Fees
+            if (/BIAYA ADM|BIAYA TRANSFER|ADMIN FEE|SERVICE FEE|CHARGE|ADMINISTRASI/.test(d)) return "Fees & Charges";
+            
+            // F&B
+            if (/GOFOOD|GRABFOOD|SHOPEEFOOD|RESTAURANT|CAFE|KOPI|BAKERY|FOOD|DINING|MCD|COUVEE|SOTO|MIE|AYAM|CHICKEN|COFFEE|BAKERY|CAKE|DESSERT|MAKO|ESTUARY|XOPI|SAMBEL|YOSHINOYA|CHATIME|QPON/.test(d)) return "Food & Beverage";
+            
+            // Transport
+            if (/GOJEK|GRAB|PERTAMINA|SHELL|TOLL|PARKIR|TIKET|TRAVELOKA|KAI|FLIGHT|TAXI|JOPARK/.test(d)) return "Transport & Travel";
+            
+            // Shopping
+            if (/TOKOPEDIA|SHOPEE|LAZADA|ALFAMART|INDOMARET|SUPERMARKET|HYPERMART|MALL|FASHION|CLOTHING|MARKET|IDM|ALFA|UNIQLO|TRANSMART|MDS/.test(d)) return "Shopping & Groceries";
+            
+            // Utilities
+            if (/PLN|PAM|TELKOM|INTERNET|PULSA|BPJS|PBB|SUBSCRIPTION|BILL|SMARTFREN|TELKOMSEL|XL|INDOSAT/.test(d)) return "Utilities & Bills";
+            
+            // Entertainment
+            if (/NETFLIX|SPOTIFY|DISNEY|CINEMA|CGV|XXI|GAME|STEAM|PLAYSTATION|STARCADE/.test(d)) return "Entertainment";
+            
+            // Health
+            if (/APOTEK|PHARMACY|HOSPITAL|CLINIC|DOKTER|DOCTOR|SALON|BARBERSHOP|WATSONS|GUARDIAN/.test(d)) return "Health & Personal Care";
+
+            if (type === "Income") {
+                if (/SALARY|GAJI|BONUS|PAYROLL|REWARD/.test(d)) return "Income: Salary & Bonus";
+                if (/BUNGA|INTEREST|EARNING/.test(d)) return "Income: Wealth";
+                return "Income: Other";
+            }
+
+            if (/TRANSFER|TRSF|BI-FAST|OVERBOOKING|TOPUP|TOP-UP|E-WALLET|OVO|GOPAY|DANA|SHOPEEPAY/.test(d)) return "Transfer & Topup";
+            if (/ATM|PENARIKAN TUNAI|TARIKAN/.test(d)) return "Cash Withdrawal";
+
+            return "Other";
+        }
+
+        function parseBCA(text) {
+            parsedTransactions = [];
+            const lines = text.split('\n');
+            const yearMatch = text.match(/PERIODE\s*:\s*\w+\s+(\d{4})/);
+            const year = yearMatch ? yearMatch[1] : new Date().getFullYear();
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                const dateMatch = line.match(/^(\d{2}\/\d{2})\s+(.+)/);
+                if (dateMatch) {
+                    const dateStr = dateMatch[1];
+                    let txLines = [dateMatch[2]];
+                    
+                    let j = i + 1;
+                    while (j < lines.length) {
+                        const nextLine = lines[j].trim();
+                        if (/^\d{2}\/\d{2}\s+/.test(nextLine)) break;
+                        if (nextLine && !/HALAMAN|PERIODE|SALDO AWAL|SALDO AKHIR/i.test(nextLine)) {
+                            txLines.push(nextLine);
+                        }
+                        j++;
+                    }
+                    i = j - 1;
+
+                    const fullText = txLines.join(' ');
+                    if (/SALDO AWAL/i.test(fullText)) continue;
+
+                    const amtMatches = [...fullText.matchAll(/([\d,]+\.\d{2})\s*(DB)?/g)];
+                    for (const match of amtMatches) {
+                        const amtStr = match[1];
+                        const isDb = match[2];
+                        const amt = parseFloat(amtStr.replace(/,/g, ''));
+                        if (amt > 0) {
+                            const desc = cleanDescription(fullText);
+                            const type = isDb ? 'Expense' : 'Income';
+                            parsedTransactions.push({
+                                Date: `${dateStr}/${year}`,
+                                Description: desc,
+                                Category: categorize(desc, type),
+                                Type: type,
+                                Amount: amt
+                            });
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        function parseCIMB(text) {
+            parsedTransactions = [];
+            const lines = text.split('\n');
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                const dateMatch = line.match(/^(\d{2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})/);
+                if (dateMatch) {
+                    const dateStr = `${dateMatch[1]} ${dateMatch[2]} ${dateMatch[3]}`;
+                    let txLines = [line.substring(dateMatch[0].length).trim()];
+                    
+                    let j = i + 1;
+                    // Check for time
+                    const timeMatch = lines[j]?.trim().match(/^(\d{2}:\d{2}:\d{2})/);
+                    if (timeMatch) {
+                        txLines.push(lines[j].trim().substring(timeMatch[0].length).trim());
+                        j++;
+                    }
+
+                    while (j < lines.length) {
+                        const nextLine = lines[j].trim();
+                        if (/^\d{2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}/.test(nextLine)) break;
+                        if (nextLine && !/Page|Laporan Rekening|Saldo Awal/i.test(nextLine)) {
+                            txLines.push(nextLine);
+                        }
+                        j++;
+                    }
+                    i = j - 1;
+
+                    const fullText = txLines.join(' ');
+                    const debitMatch = fullText.match(/-(\d{1,3}(?:,\d{3})*(?:\.\d{2}))/);
+                    const creditMatch = fullText.match(/(?<!-)(\d{1,3}(?:,\d{3})*\.\d{2})/);
+                    
+                    let amt = 0, type = "Expense";
+                    if (debitMatch) {
+                        amt = parseFloat(debitMatch[1].replace(/,/g, ''));
+                        type = "Expense";
+                    } else if (creditMatch) {
+                        amt = parseFloat(creditMatch[1].replace(/,/g, ''));
+                        type = fullText.toUpperCase().includes('FROM') || fullText.toUpperCase().includes('CR') ? "Income" : "Expense";
+                    }
+
+                    if (amt > 0) {
+                        const desc = cleanDescription(fullText);
+                        parsedTransactions.push({
+                            Date: dateStr,
+                            Description: desc,
+                            Category: categorize(desc, type),
+                            Type: type,
+                            Amount: amt
+                        });
+                    }
+                }
+            }
+        }
+
+        function parseMandiri(data) {
+            parsedTransactions = [];
+            let headerRow = -1;
+            for (let i = 0; i < data.length; i++) {
+                if (data[i].some(cell => String(cell).includes('Tanggal')) && data[i].some(cell => String(cell).includes('No'))) {
+                    headerRow = i;
+                    break;
+                }
+            }
+
+            if (headerRow === -1) throw new Error("Could not find Mandiri header row in XLSX.");
+
+            for (let i = headerRow + 2; i < data.length; i += 2) {
+                const row = data[i];
+                if (!row || !row[0] || isNaN(row[0])) continue;
+
+                const dateVal = row[4];
+                const remarks = row[7] || "";
+                const income = row[15];
+                const expense = row[18];
+
+                let amt = 0, type = "Expense";
+                if (expense) {
+                    amt = typeof expense === 'number' ? expense : parseFloat(String(expense).replace(/\./g, '').replace(',', '.'));
+                    type = "Expense";
+                } else if (income) {
+                    amt = typeof income === 'number' ? income : parseFloat(String(income).replace(/\./g, '').replace(',', '.'));
+                    type = "Income";
+                }
+
+                if (amt > 0) {
+                    const desc = cleanDescription(String(remarks));
+                    parsedTransactions.push({
+                        Date: dateVal,
+                        Description: desc,
+                        Category: categorize(desc, type),
+                        Type: type,
+                        Amount: amt
+                    });
+                }
+            }
+        }
+
+        // --- Ported Logic End ---
+
+        function renderResults() {
+            const container = document.getElementById('resultsContainer');
+            const emptyState = document.getElementById('emptyState');
+            const tbody = document.getElementById('txBody');
+            
+            tbody.innerHTML = '';
+            let totalIn = 0, totalOut = 0;
+
+            parsedTransactions.forEach(tx => {
+                if (tx.Type === 'Income') totalIn += tx.Amount;
+                else totalOut += tx.Amount;
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="col-date">${tx.Date}</td>
+                    <td class="col-desc">${tx.Description}</td>
+                    <td class="col-cat"><span class="badge badge-cat">${tx.Category}</span></td>
+                    <td class="col-type"><span class="badge ${tx.Type === 'Income' ? 'badge-income' : 'badge-expense'}">${tx.Type}</span></td>
+                    <td class="col-amount ${tx.Type === 'Income' ? 'amount-pos' : 'amount-neg'}">
+                        ${tx.Type === 'Income' ? '+' : '-'}${tx.Amount.toLocaleString('id-ID')}
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            document.getElementById('countVal').innerText = parsedTransactions.length;
+            document.getElementById('incomeVal').innerText = `Rp ${totalIn.toLocaleString('id-ID')}`;
+            document.getElementById('expenseVal').innerText = `Rp ${totalOut.toLocaleString('id-ID')}`;
+
+            container.style.display = parsedTransactions.length > 0 ? 'block' : 'none';
+            emptyState.style.display = parsedTransactions.length > 0 ? 'none' : 'block';
+        }
+
+        function downloadCSV() {
+            if (parsedTransactions.length === 0) return;
+            const headers = ['Date', 'Description', 'Category', 'Type', 'Amount', 'Currency'];
+            const rows = parsedTransactions.map(tx => [
+                tx.Date,
+                `"${tx.Description.replace(/"/g, '""')}"`,
+                tx.Category,
+                tx.Type,
+                tx.Amount,
+                'IDR'
+            ]);
+
+            const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `parsed_statement_${new Date().getTime()}.csv`;
+            link.click();
+        }
+
+        function showLoader(text) {
+            loader.style.display = 'flex';
+            loaderText.innerText = text;
+        }
+
+        function hideLoader() {
+            loader.style.display = 'none';
+        }
+    </script>
+</body>
+</html>
