@@ -1,6 +1,6 @@
 # Bank Statement Parser (Standalone)
 
-A unified tool to parse bank statements from BCA, Mandiri, and CIMB into a standardized CSV format.
+A unified tool to parse bank statements from BCA, Mandiri, and CIMB into a standardized CSV format. (Mainly for being used in Money Manager App)
 
 ## Features
 ### Supported Banks
